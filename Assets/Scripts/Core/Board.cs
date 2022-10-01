@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class Board : MonoBehaviour
 {
-    private Transform[,] grid;
+    public Transform[,] grid;
 
     public ParticlePlayer[] rowGlowFx = new ParticlePlayer[4];
 
@@ -63,6 +63,15 @@ public class Board : MonoBehaviour
         return true;
     }
 
+    private bool IsEmpty(int y)
+    {
+        for (int x = 0; x < width; x++)
+            if (grid[x, y] != null)
+                return false;
+
+        return true;
+    }
+
     private void ClearRow(int y)
     {
         for (int x = 0; x < width; x++)
@@ -72,6 +81,17 @@ public class Board : MonoBehaviour
 
             grid[x, y] = null;
         }
+    }
+
+    public bool IsClear()
+    {
+        for (int y = 0; y < height; y++)
+        {
+            if (!IsComplete(y) && !IsEmpty(y))
+                return false;
+        }
+
+        return true;
     }
 
     private void ShiftOneRowDown(int y)

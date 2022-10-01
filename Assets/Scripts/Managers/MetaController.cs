@@ -3,13 +3,12 @@ using UnityEngine.SceneManagement;
 
 using System.Collections;
 
-public class GameController : MonoBehaviour
+public class MetaController : MonoBehaviour
 {
     private Board gameBoard;
     private Spawner spawner;
     private Shape activeShape;
     private Ghost ghost;
-    private Holder holder;
 
     private SoundManager soundManager;
     private ScoreManager scoreManager;
@@ -43,10 +42,13 @@ public class GameController : MonoBehaviour
     public GameObject pausePanel;
     public GameObject gameOverPanel;
 
+    public GameObject roundedBlock;
+
     private bool gameOver = false;
     private bool rotateClockwise = true;
 
     public bool isPaused = false;
+    public bool isPausedByGame = false;
 
     private enum Direction { none, left, right, up, down }
 
@@ -67,11 +69,13 @@ public class GameController : MonoBehaviour
 
     private void Start()
     {
+        isPausedByGame = true;
+        Time.timeScale = isPaused || isPausedByGame ? 0 : 1;
+
         gameBoard = GameObject.FindObjectOfType<Board>();
         spawner = GameObject.FindObjectOfType<Spawner>();
 
         ghost = GameObject.FindObjectOfType<Ghost>();
-        holder = GameObject.FindObjectOfType<Holder>();
 
         soundManager = GameObject.FindObjectOfType<SoundManager>();
         scoreManager = GameObject.FindObjectOfType<ScoreManager>();
@@ -92,9 +96,6 @@ public class GameController : MonoBehaviour
 
         if (!spawner)
             Debug.Log("No spawner");
-        
-        if (activeShape == null)
-            activeShape = spawner.SpawnShape();
 
         if (gameOverPanel)
             gameOverPanel.SetActive(false);
@@ -103,12 +104,26 @@ public class GameController : MonoBehaviour
             pausePanel.SetActive(false);
 
         dropIntervalModded = dropInterval;
+
+        {
+            var dummyCube = Instantiate(roundedBlock, spawner.transform);
+            dummyCube.transform.position = new Vector3(-4.5f, -12, 1);
+
+            gameBoard.grid[0, 0] = dummyCube.transform;
+        }
+
+        {
+            var dummyCube = Instantiate(roundedBlock, spawner.transform);
+            dummyCube.transform.position = new Vector3( 4.5f, -12, 1);
+
+            gameBoard.grid[9, 0] = dummyCube.transform;
+        }
     }
 
     private void MoveRight()
     {
         activeShape.MoveRight();
-        timeToNextKeyLeftRight   = Time.time + keyRepeatRateLeftRight;
+        timeToNextKeyLeftRight = Time.time + keyRepeatRateLeftRight;
         timeToNextSwipeLeftRight = Time.time + swipeRepeatRateLeftRight;
 
         if (!gameBoard.IsValidPosition(activeShape))
@@ -118,7 +133,7 @@ public class GameController : MonoBehaviour
     private void MoveLeft()
     {
         activeShape.MoveLeft();
-        timeToNextKeyLeftRight   = Time.time + keyRepeatRateLeftRight;
+        timeToNextKeyLeftRight = Time.time + keyRepeatRateLeftRight;
         timeToNextSwipeLeftRight = Time.time + swipeRepeatRateLeftRight;
 
         if (!gameBoard.IsValidPosition(activeShape))
@@ -207,10 +222,6 @@ public class GameController : MonoBehaviour
         {
             TogglePause();
         }
-        else if (Input.GetButtonDown("Hold"))
-        {
-            Hold();
-        }
     }
 
     private void GameOver()
@@ -244,14 +255,7 @@ public class GameController : MonoBehaviour
         if (ghost)
             ghost.Reset();
 
-        if (holder)
-            holder.canRelease = true;
-
-        activeShape = spawner.SpawnShape();
-
         gameBoard.StartCoroutine(gameBoard.ClearAllRows());
-
-        scoreManager.NewShape();
 
         if (gameBoard.completedRows > 0)
         {
@@ -260,6 +264,17 @@ public class GameController : MonoBehaviour
             if (scoreManager.didLevelUp)
                 dropIntervalModded = dropInterval - Mathf.Clamp((((float)scoreManager.level - 1) * 0.1f), 0.05f, 1f);
         }
+
+        if(gameBoard.IsClear())
+        {
+            scoreManager.gold += 1000;
+            scoreManager.SaveGame();
+            Exit();
+        }    
+
+
+        isPausedByGame = true;
+        Time.timeScale = isPaused || isPausedByGame ? 0 : 1;
     }
 
     private void PlaySound(AudioClip clip)
@@ -282,7 +297,7 @@ public class GameController : MonoBehaviour
 
     private void LateUpdate()
     {
-        if (ghost)
+        if (ghost && activeShape)
             ghost.DrawGhost(activeShape, gameBoard);
     }
 
@@ -312,13 +327,6 @@ public class GameController : MonoBehaviour
         return swipeDirection;
     }
 
-    public void Restart()
-    {
-        scoreManager.SaveGame();
-
-        Time.timeScale = 1f;
-        SceneManager.LoadScene("Game");
-    }
 
     public void Exit()
     {
@@ -352,29 +360,98 @@ public class GameController : MonoBehaviour
                     isPaused ? soundManager.musicVolume * 0.25f : soundManager.musicVolume;
             }
 
-            Time.timeScale = isPaused ? 0 : 1;
+            Time.timeScale = isPaused || isPausedByGame ? 0 : 1;
         }
     }
 
-    public void Hold()
+    public void SpawnShape(Shape shape)
     {
-        if (!holder)
+        if (isPaused)
             return;
 
-        if (!holder.heldShape)
-        {
-            holder.Catch(activeShape);
-            activeShape = spawner.SpawnShape();
-        }
-        else if (holder.canRelease)
-        {
-            Shape shape = activeShape;
-            activeShape = holder.Release();
-            activeShape.transform.position = spawner.transform.position;
-            holder.Catch(shape);
-        }
+        if (!isPausedByGame)
+            return;
 
-        if (ghost)
-            ghost.Reset();
+        //if (scoreManager.metaBricks < 1)
+         //   return;
+
+        scoreManager.metaBricks--;
+        scoreManager.SaveGame();
+
+        activeShape = Instantiate<Shape>(shape, spawner.transform);
+        spawner.SpawnShape(activeShape);
+
+        isPausedByGame = false;
+        Time.timeScale = isPaused || isPausedByGame ? 0 : 1;
+    }
+
+    public void SpawnI()
+    {
+        foreach (var shape in spawner.allShapes)
+            if (shape.name == "ShapeI")
+            {
+                SpawnShape(shape);
+                return;
+            }
+    }
+
+    public void SpawnJ()
+    {
+        foreach (var shape in spawner.allShapes)
+            if (shape.name == "ShapeJ")
+            {
+                SpawnShape(shape);
+                return;
+            }
+    }
+
+    public void SpawnL()
+    {
+        foreach (var shape in spawner.allShapes)
+            if (shape.name == "ShapeL")
+            {
+                SpawnShape(shape);
+                return;
+            }
+    }
+
+    public void SpawnO()
+    {
+        foreach (var shape in spawner.allShapes)
+            if (shape.name == "ShapeO")
+            {
+                SpawnShape(shape);
+                return;
+            }
+    }
+
+    public void SpawnS()
+    {
+        foreach (var shape in spawner.allShapes)
+            if (shape.name == "ShapeS")
+            {
+                SpawnShape(shape);
+                return;
+            }
+    }
+
+    public void SpawnT()
+    {
+        foreach (var shape in spawner.allShapes)
+            if (shape.name == "ShapeT")
+            {
+                SpawnShape(shape);
+                return;
+            }
+    }
+
+    public void SpawnZ()
+    {
+        foreach (var shape in spawner.allShapes)
+            if (shape.name == "ShapeZ")
+            {
+                SpawnShape(shape);
+                return;
+            }
     }
 }

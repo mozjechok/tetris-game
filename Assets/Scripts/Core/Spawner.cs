@@ -63,7 +63,7 @@ public class Spawner : MonoBehaviour
     private Shape GetQueuedShape()
     {
         if (UseQueue)
-            return GetRandomShape();
+            return Instantiate<Shape>(GetRandomShape());
 
         Shape firstShape = null;
 
@@ -92,14 +92,12 @@ public class Spawner : MonoBehaviour
 
         growTime = Mathf.Clamp(growTime, 0.1f, 2f);
 
-        float sizeDelta = Time.deltaTime / growTime;
-
         while (size < 1f)
         {
             shape.transform.localScale = new Vector3(size, size, size);
             shape.transform.position = position;
 
-            size += sizeDelta;
+            size += (float)Time.deltaTime / (float)growTime;
             
             yield return null;
         }
@@ -113,6 +111,7 @@ public class Spawner : MonoBehaviour
             shape = GetQueuedShape();
 
         shape.transform.position = transform.position;
+        shape.transform.localScale = new Vector3(queueScale, queueScale, queueScale);
 
         StartCoroutine(GrowShape(shape, transform.position, 0.25f));
 

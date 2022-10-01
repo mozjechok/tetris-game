@@ -61,7 +61,7 @@ public class MenuController : MonoBehaviour
 
     public void Meta()
     {
-
+        SceneManager.LoadScene("Meta");
     }
 
     public void ToggleShop()
